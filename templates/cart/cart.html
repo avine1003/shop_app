@@ -1,0 +1,7 @@
+{% extends 'base_main.html' %}
+{% load static %}
+
+{% block extCSS %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'axf/cart/css/cart.css' %}">
+{% endblock %}
