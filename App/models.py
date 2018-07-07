@@ -146,3 +146,33 @@ class UserModel(models.Model):
 
     class Meta:
         db_table = 'axf_user'
+
+
+class Cart(models.Model):
+    c_goods = models.ForeignKey(Goods)
+    c_user = models.ForeignKey(UserModel)
+    is_select = models.BooleanField(default=True)
+    c_goods_num = models.IntegerField(default=1)
+
+    class Meta:
+        db_table = 'axf_cart'
+
+
+class Order(models.Model):
+    o_user = models.ForeignKey(UserModel)
+    o_total_price = models.FloatField(default=0)
+    # status默认已下单未付款
+    o_status = models.IntegerField(default=0)
+    o_time = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'axf_order'
+
+
+class OrderGoods(models.Model):
+    o_order = models.ForeignKey(Order)
+    o_goods = models.ForeignKey(Goods)
+    o_goods_num = models.IntegerField(default=1)
+
+    class Meta:
+        db_table = 'axf_ordergoods'

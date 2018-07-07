@@ -10,9 +10,9 @@ from django.views import View
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
-from App.models import MainWheel, MainNav, MainMustBuy, MainShop, MainShow, FoodType, Goods, UserModel
+from App.models import MainWheel, MainNav, MainMustBuy, MainShop, MainShow, FoodType, Goods, UserModel, Cart
 
-from App.viewhelper import get_user, send_mail_to
+from App.viewhelper import get_user, send_mail_to, get_user_by_id, get_total_price
 
 ALL_TYPE = '0'
 TOTAL_RULE = '0'
@@ -131,10 +131,25 @@ def marketWithParams(request, typeid, cid, sort_rule):
 
 
 def cart(request):
-    data = {
-        "title": "购物车"
-    }
+    user_id = request.session.get('user_id')
+    user = get_user_by_id(user_id)
 
+    if not user:
+        return redirect(reverse("axf:user_login"))
+
+    carts = user.cart_set.all()
+    all_select = True
+
+    if carts.filter(is_select=False):
+        all_select = False
+
+    total_price = get_total_price(user_id)
+    data = {
+        "title": "购物车",
+        'carts':carts,
+        'all_select':all_select,
+        'total_price':total_price,
+    }
     return render(request, 'cart/cart.html', context=data)
 
 
@@ -155,8 +170,33 @@ def mine(request):
 
 
 def add_to_cart(request):
-    goodsid = request.GET.get('goodsid')
-    return JsonResponse({'msg': 'ok', 'goodsid': goodsid})
+    user_id = request.session.get('user_id')
+    user = get_user_by_id(user_id)
+    data = {}
+    if not user:
+        # 重定向
+        data['status'] = '302'
+        data['msg'] = 'not login'
+    else:
+        goods_id = request.GET.get("goodsid")
+        carts = Cart.objects.filter(c_user=user).filter(c_goods_id=goods_id)
+
+        if carts:
+            # 商品已存在时（数量不为0）
+            cart_obj = carts[0]
+            cart_obj.c_goods_num = cart_obj.c_goods_num + 1
+            cart_obj.save()
+        else:
+            # 商品不存在
+            cart_obj = Cart()
+            cart_obj.c_goods_id = goods_id
+            cart_obj.c_user_id = user_id
+            cart_obj.save()
+
+        data['msg'] = 'add success'
+        data['status'] = '200'
+        data['cart_goods_num'] = cart_obj.c_goods_num
+    return JsonResponse(data)
 
 
 class UserView(View):
@@ -257,3 +297,72 @@ def active(request):
         return HttpResponse("激活成功")
     else:
         return HttpResponse("激活信息过期，请重新激活")
+
+
+def change_cart_status(request):
+    cart_id = request.GET.get('cartid')
+    cart_obj = Cart.objects.get(pk=cart_id)
+    cart_obj.is_select = not cart_obj.is_select
+    cart_obj.save()
+    all_select = True
+
+    if cart_obj.is_select:
+        user_id = request.session.get('user_id')
+        carts = Cart.objects.filter(c_user_id=user_id).filter(is_select=False)
+        if carts:
+            all_select = False
+
+    data = {
+        'msg': 'ok',
+        'status': '200',
+        'is_select': cart_obj.is_select,
+        'all_select': all_select,
+        'total_price': get_total_price(request.session.get('user_id'))
+    }
+    return JsonResponse(data)
+
+
+def change_cart_list_status(request):
+    action = request.GET.get('action')
+    cart_list = request.GET.get('cartlist')
+
+    carts = cart_list.split('#')
+
+    if action == 'select':
+        # Cart.objects.filter(pk__in=carts).update({'is_select': True})
+        for cart_id in carts:
+            cart_obj = Cart.objects.get(pk=cart_id)
+            cart_obj.is_select = True
+            cart_obj.save()
+    elif action == 'unselect':
+        # Cart.objects.filter(pk__in=carts).update({'is_select': False})
+        for cart_id in carts:
+            cart_obj = Cart.objects.get(pk=cart_id)
+            cart_obj.is_select = False
+            cart_obj.save()
+    data = {
+        'msg': 'ok',
+        'status': '200',
+        'action': action,
+        'total_price': get_total_price(request.session.get('user_id'))
+    }
+    return JsonResponse(data)
+
+
+def sub_to_cart(request):
+    cartid = request.GET.get('cartid')
+    cart_obj = Cart.objects.get(pk=cartid)
+    data = {
+        'status': '200',
+        'msg': 'ok',
+    }
+
+    if cart_obj.c_goods_num == 1:
+        cart_obj.delete()
+        data['c_goods_num'] = 0
+    else:
+        cart_obj.c_goods_num = cart_obj.c_goods_num - 1
+        cart_obj.save()
+        data['c_goods_num'] = cart_obj.c_goods_num
+    data['total_price'] = get_total_price(request.session.get('user_id'))
+    return JsonResponse(data)

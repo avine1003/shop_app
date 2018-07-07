@@ -18,4 +18,7 @@ urlpatterns = [
     url(r'^userlogin/', UserLoginView.as_view(), name='user_login'),
 
     url(r'^active/', views.active, name='active'),
+    url(r'^changecartstatus/', views.change_cart_status, name='change_cart_status'),
+    url(r'^changecartliststatus/', views.change_cart_list_status, name='change_cart_list_status'),
+    url(r'^subtocart/', views.sub_to_cart, name='sub_to_cart'),
 ]

@@ -5,7 +5,7 @@ __date__ = "2018/7/5 10:06"
 from django.core.mail import send_mail
 from django.template import loader
 
-from App.models import UserModel
+from App.models import UserModel, Cart
 
 
 def get_user(username):
@@ -28,3 +28,21 @@ def send_mail_to(username, active_url, receive_mail):
 
     send_mail(subject,'', from_email="wusezdhwuyou@163.com", recipient_list=[receive_mail],
               html_message=html_message)
+
+def get_user_by_id(user_id):
+    try:
+        user=UserModel.objects.get(pk=user_id)
+        return user
+    except:
+        return None
+
+def get_total_price(user_id):
+    carts = Cart.objects.filter(c_user_id=user_id)
+
+    total_price = 0
+
+    for cart_obj in carts:
+        if cart_obj.is_select:
+            total_price += cart_obj.c_goods_num * cart_obj.c_goods.price
+
+    return total_price

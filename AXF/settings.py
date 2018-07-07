@@ -150,3 +150,9 @@ EMAIL_PORT = 25
 EMAIL_HOST_USER = "wusezdhwuyou@163.com"
 
 EMAIL_HOST_PASSWORD = "zxcv1234"
+
+INTERNAL_IPS = ['127.0.0.1',]
+
+DEBUG_TOOLBAR_CONFIG = {
+    'JQUERY_URL': '/static/js/jquery.js'
+}

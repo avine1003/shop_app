@@ -51,23 +51,26 @@ $(function () {
 
         console.log("添加到购物车");
 
-        var goodsid = $(this).attr("goodsid");
+        var $add = $(this);
+
+        var goodsid = $add.attr("goodsid");
 
         // console.log($(this).prop("goodsid"));
 
         // 参数可以直接进行拼接
         // 也可以使用第二个参数传递字典的形式进行参数设置  更推荐使用第二种
-        $.getJSON("/axf/addtocart/",{"goodsid": goodsid} ,function (data) {
+        $.getJSON("/axf/addtocart/", {"goodsid": goodsid}, function (data) {
             console.log(data);
 
-        //    ajax请求回来之后的操作 写在这
+            if (data["status"] == "302") {
+                window.open('/axf/userlogin/', target = "_self");
+            } else if (data['status'] == "200") {
+                console.log("改变数量");
+                $add.prev("span").html(data["cart_goods_num"]);
+            }
 
         })
 
-        // ajax 并行操作写在这
-        // console.log("哈哈");
-
     })
-
 
 })
