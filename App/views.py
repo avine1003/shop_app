@@ -1,3 +1,4 @@
+import random
 import uuid
 
 from django.core.cache import cache
@@ -10,9 +11,11 @@ from django.views import View
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
-from App.models import MainWheel, MainNav, MainMustBuy, MainShop, MainShow, FoodType, Goods, UserModel, Cart
+from App.models import MainWheel, MainNav, MainMustBuy, MainShop, MainShow, FoodType, Goods, UserModel, Cart, Order, \
+    OrderGoods
 
-from App.viewhelper import get_user, send_mail_to, get_user_by_id, get_total_price
+from App.viewhelper import get_user, get_user_by_id, get_total_price
+from App.tasks import send_mail_to
 
 ALL_TYPE = '0'
 TOTAL_RULE = '0'
@@ -214,13 +217,9 @@ class UserView(View):
         # 生成token  
         # uuid
         token = str(uuid.uuid4())
-
         cache.set(token, user.id, timeout=60 * 60 * 24)
-
         active_url = "http://localhost:8000/axf/active/?token=" + token
-
-        send_mail_to(u_username, active_url, u_email)
-
+        send_mail_to.delay(u_username, active_url, u_email)   # celery 异步执行
         # request.session['user_id'] = user.id
         return redirect(reverse("axf:user_login"))
 
@@ -366,3 +365,68 @@ def sub_to_cart(request):
         data['c_goods_num'] = cart_obj.c_goods_num
     data['total_price'] = get_total_price(request.session.get('user_id'))
     return JsonResponse(data)
+
+
+def make_order(request):
+    cartlist = request.GET.get('cartlist')
+    cart_list = cartlist.split('#')
+    order = Order()
+    user_id = request.session.get('user_id')
+    order.o_user_id = user_id
+    order.o_total_price = get_total_price(user_id)
+    order.save()
+
+    for cart_id in cart_list:
+        ordergoods = OrderGoods()
+        cart_obj = Cart.objects.get(pk=cart_id)
+        ordergoods.o_goods_num = cart_obj.c_goods_num
+        ordergoods.o_order_id = order.id
+        ordergoods.o_goods_id = cart_obj.c_goods_id
+        ordergoods.save()
+        cart_obj.delete()
+
+    data = {
+        'msg': 'ok',
+        'orderid': order.id,
+        'status': '200',
+    }
+    return JsonResponse(data)
+
+
+def order_detail(request):
+    order_id = request.GET.get('order_id')
+    order = Order.objects.get(pk=order_id)
+    data = {
+        'title': "订单详情",
+        'order': order
+    }
+    return render(request, 'order/order_detail.html', context=data)
+
+def order_list(request):
+    user_id = request.session.get('user_id')
+    user = get_user_by_id(user_id)
+    orders = user.order_set.filter(o_status=0)
+    data = {
+        'title': '订单列表',
+        'orders': orders
+    }
+    return render(request, 'order/order_list.html', context=data)
+
+def alipay(request):
+    order_id = request.GET.get('orderid')
+    order = Order.objects.get(pk=order_id)
+    order.o_status = 1
+    order.save()
+    data = {
+        'msg': 'ok',
+        'status': '200'
+    }
+    return JsonResponse(data)
+
+
+def get_phone(request):
+    num = random.randrange(100)
+    if num > 90:
+        return HttpResponse('恭喜你中奖了')
+    else:
+        return HttpResponse('正在排队')
